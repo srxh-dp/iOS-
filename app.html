@@ -1,0 +1,865 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Wifi, Battery, Signal, ChevronRight, Moon, Sun, 
+  Bluetooth, Volume2, Camera, Music, Settings, 
+  MessageSquare, Phone, Globe, Image as ImageIcon,
+  Mic, Search, X, Play, Pause, SkipForward, SkipBack,
+  Flashlight, Calculator, Bell, Lock, Unlock, Zap,
+  ArrowLeft, Share, Book, LayoutGrid, Clock, User,
+  Send, PhoneCall, Video, Info,
+  Cloud, Map, FileText, List, ShoppingBag, CreditCard,
+  Calendar as CalendarIcon, Radio, Tv, Newspaper, Folder, Command, Languages,
+  Activity, CheckCircle2, Circle, Plus, Download, MapPin, 
+  MoreHorizontal, Edit3, Trash2, StopCircle, Timer, AlarmClock,
+  Heart, ChevronLeft, RefreshCcw, Plane, Gamepad2, Layers
+} from 'lucide-react';
+
+// --- Assets & Data ---
+
+const WALLPAPER_URL = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop";
+
+const SONGS = [
+  { title: "Midnight City", artist: "M83", cover: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=2070&auto=format&fit=crop", duration: 243 },
+  { title: "Starboy", artist: "The Weeknd", cover: "https://images.unsplash.com/photo-1514525253440-b393452e2380?q=80&w=1951&auto=format&fit=crop", duration: 230 },
+  { title: "Neon Lights", artist: "Kraftwerk", cover: "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=2000&auto=format&fit=crop", duration: 350 }
+];
+
+const INITIAL_PHOTOS = [
+  { id: 1, url: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=500&auto=format&fit=crop", liked: false },
+  { id: 2, url: "https://images.unsplash.com/photo-1502082553048-f009c37129b9?w=500&auto=format&fit=crop", liked: true },
+  { id: 3, url: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=500&auto=format&fit=crop", liked: false },
+];
+
+const INITIAL_CHATS = [
+  { id: 1, name: "Alice Design", msgs: [{text: "新的 UI 图发给你了，看一下？", isMe: false}], time: "9:41 AM", avatar: "bg-pink-400" },
+  { id: 2, name: "Bob Engineer", msgs: [{text: "Server is down again...", isMe: false}], time: "Yesterday", avatar: "bg-blue-400" },
+];
+
+const CITIES = [
+    { name: 'Cupertino', temp: 21, condition: 'Mostly Clear', h: 24, l: 16, bg: 'from-blue-400 to-blue-600' },
+    { name: 'New York', temp: 12, condition: 'Rain', h: 14, l: 8, bg: 'from-gray-500 to-gray-700' },
+    { name: 'Tokyo', temp: 18, condition: 'Cloudy', h: 20, l: 15, bg: 'from-indigo-400 to-purple-600' },
+];
+
+const APPS_PAGE_1 = [
+  { id: 'weather', name: '天气', icon: Cloud, color: 'bg-blue-400' },
+  { id: 'calendar', name: '日历', icon: CalendarIcon, color: 'bg-white text-black' },
+  { id: 'photos', name: '相册', icon: ImageIcon, color: 'bg-gradient-to-br from-blue-400 to-purple-500' },
+  { id: 'camera', name: '相机', icon: Camera, color: 'bg-gray-800' },
+  { id: 'maps', name: '地图', icon: Map, color: 'bg-green-500' },
+  { id: 'clock', name: '时钟', icon: Clock, color: 'bg-black border border-gray-700' },
+  { id: 'news', name: '新闻', icon: Newspaper, color: 'bg-red-500' },
+  { id: 'wallet', name: '钱包', icon: CreditCard, color: 'bg-black border border-gray-700' },
+];
+
+const APPS_PAGE_2 = [
+  { id: 'settings', name: '设置', icon: Settings, color: 'bg-gray-500' },
+  { id: 'calculator', name: '计算器', icon: Calculator, color: 'bg-orange-500' },
+  { id: 'notes', name: '备忘录', icon: FileText, color: 'bg-yellow-400' },
+  { id: 'reminders', name: '提醒', icon: List, color: 'bg-white text-blue-500' },
+  { id: 'store', name: 'App Store', icon: ShoppingBag, color: 'bg-blue-600' },
+  { id: 'health', name: '健康', icon: Activity, color: 'bg-white text-red-500' },
+  { id: 'files', name: '文件', icon: Folder, color: 'bg-blue-400' },
+  { id: 'siri', name: 'Siri', icon: Mic, color: 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500' },
+];
+
+const DOCK_APPS = [
+  { id: 'phone', name: '电话', icon: Phone, color: 'bg-green-500' },
+  { id: 'safari', name: 'Safari', icon: Globe, color: 'bg-blue-500' },
+  { id: 'messages', name: '信息', icon: MessageSquare, color: 'bg-green-500' },
+  { id: 'music', name: '音乐', icon: Music, color: 'bg-red-500' },
+];
+
+// --- Sub-Components (Status Bar, Island, Icon) ---
+
+const StatusBar = ({ time, wifiOn }) => (
+  <div className="absolute top-0 w-full px-6 py-3 flex justify-between items-center text-white z-50 text-xs font-medium tracking-wide pointer-events-none">
+    <div className="w-1/3">{time}</div>
+    <div className="flex space-x-2 w-1/3 justify-end items-center">
+      <Signal size={14} />
+      {wifiOn && <Wifi size={14} />}
+      <Battery size={14} />
+    </div>
+  </div>
+);
+
+const DynamicIsland = ({ mode, text }) => {
+  let width = "w-[100px]";
+  let height = "h-[28px]";
+  let content = null;
+
+  if (mode === 'music') {
+    width = "w-[180px]";
+    height = "h-[28px]";
+    content = (
+      <div className="flex justify-between items-center w-full px-4 h-full">
+        <div className="flex gap-1">
+             <div className="w-0.5 h-3 bg-red-400 animate-pulse"></div>
+             <div className="w-0.5 h-2 bg-red-400 animate-pulse delay-75"></div>
+        </div>
+        <div className="flex space-x-1 items-end h-3">
+            <div className="w-1 h-2 bg-green-400 animate-bounce"></div>
+            <div className="w-1 h-3 bg-green-400 animate-bounce delay-75"></div>
+            <div className="w-1 h-1 bg-green-400 animate-bounce delay-150"></div>
+        </div>
+      </div>
+    );
+  } else if (mode === 'call') {
+    width = "w-[200px]";
+    height = "h-[32px]";
+    content = (
+      <div className="flex justify-between items-center w-full px-3 h-full text-green-400 text-xs">
+         <div className="flex items-center gap-2">
+            <Phone size={12} className="animate-pulse"/>
+            <span>00:14</span>
+         </div>
+         <span className="text-white/60">Calling...</span>
+      </div>
+    );
+  } else if (mode === 'siri') {
+      width = "w-[80px]";
+      height = "h-[80px]";
+      content = (
+          <div className="w-full h-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full animate-pulse blur-md"></div>
+          </div>
+      )
+  }
+
+  return (
+    <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-[60] flex justify-center pointer-events-none">
+      <div 
+        className={`bg-black rounded-[20px] transition-all duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] ${width} ${height} flex items-center justify-center overflow-hidden border border-gray-800 shadow-xl`}
+      >
+        {content}
+      </div>
+    </div>
+  );
+};
+
+const AppIcon = ({ app, onClick }) => (
+  <button 
+    onClick={(e) => {
+        e.stopPropagation(); 
+        onClick(app.id);
+    }}
+    className="flex flex-col items-center gap-1 group active:scale-90 transition-transform duration-200 select-none"
+  >
+    <div className={`w-14 h-14 rounded-2xl ${app.color} flex items-center justify-center text-white shadow-lg shadow-black/20 backdrop-blur-md bg-opacity-80 border border-white/10 group-hover:brightness-110 relative overflow-hidden`}>
+      {app.id === 'calendar' && (
+          <div className="absolute inset-0 flex flex-col items-center pt-3 text-black">
+              <span className="text-[8px] font-bold uppercase text-red-500">WED</span>
+              <span className="text-xl font-light">21</span>
+          </div>
+      )}
+      {app.id !== 'calendar' && <app.icon size={26} strokeWidth={1.5} />}
+    </div>
+    <span className="text-[11px] text-white font-medium drop-shadow-md">{app.name}</span>
+  </button>
+);
+
+// --- APP IMPLEMENTATIONS ---
+
+const CalculatorApp = () => {
+    const [display, setDisplay] = useState('0');
+    const [prev, setPrev] = useState(null);
+    const [op, setOp] = useState(null);
+    const [newNum, setNewNum] = useState(true);
+
+    const handleNum = (num) => {
+        if(newNum) {
+            setDisplay(num);
+            setNewNum(false);
+        } else {
+            setDisplay(display === '0' ? num : display + num);
+        }
+    };
+
+    const handleOp = (o) => {
+        setOp(o);
+        setPrev(parseFloat(display));
+        setNewNum(true);
+    };
+
+    const calculate = () => {
+        if(!op || prev === null) return;
+        const current = parseFloat(display);
+        let res = 0;
+        if(op === '+') res = prev + current;
+        if(op === '-') res = prev - current;
+        if(op === '×') res = prev * current;
+        if(op === '÷') res = prev / current;
+        setDisplay(String(res).slice(0, 9));
+        setOp(null);
+        setPrev(null);
+        setNewNum(true);
+    };
+
+    const clear = () => {
+        setDisplay('0');
+        setPrev(null);
+        setOp(null);
+        setNewNum(true);
+    };
+
+    const btnClass = "h-16 w-16 rounded-full flex items-center justify-center text-2xl font-medium active:scale-95 transition-all";
+    const gray = "bg-gray-400 text-black";
+    const orange = "bg-orange-500 text-white";
+    const dark = "bg-gray-800 text-white";
+
+    return (
+      <div className="h-full bg-black text-white p-4 pt-12 flex flex-col justify-end">
+        <div className="text-right text-6xl mb-4 font-light px-2 break-all">{display}</div>
+        <div className="grid grid-cols-4 gap-3">
+           <button className={gray + " " + btnClass} onClick={clear}>AC</button>
+           <button className={gray + " " + btnClass}>+/-</button>
+           <button className={gray + " " + btnClass}>%</button>
+           <button className={orange + " " + btnClass} onClick={() => handleOp('÷')}>÷</button>
+           
+           {[7,8,9].map(n => <button key={n} className={dark + " " + btnClass} onClick={() => handleNum(String(n))}>{n}</button>)}
+           <button className={orange + " " + btnClass} onClick={() => handleOp('×')}>×</button>
+
+           {[4,5,6].map(n => <button key={n} className={dark + " " + btnClass} onClick={() => handleNum(String(n))}>{n}</button>)}
+           <button className={orange + " " + btnClass} onClick={() => handleOp('-')}>-</button>
+           
+           {[1,2,3].map(n => <button key={n} className={dark + " " + btnClass} onClick={() => handleNum(String(n))}>{n}</button>)}
+           <button className={orange + " " + btnClass} onClick={() => handleOp('+')}>+</button>
+           
+           <button className={dark + " col-span-2 w-auto rounded-full pl-6 justify-start h-16 flex items-center text-2xl font-medium"} onClick={() => handleNum('0')}>0</button>
+           <button className={dark + " " + btnClass} onClick={() => handleNum('.')}>.</button>
+           <button className={orange + " " + btnClass} onClick={calculate}>=</button>
+        </div>
+      </div>
+    );
+};
+
+const SettingsApp = ({ settings, setSettings }) => {
+  const toggle = (key) => setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+
+  return (
+    <div className="h-full bg-gray-100 text-black pt-12 overflow-y-auto">
+      <h1 className="text-3xl font-bold px-4 mb-4">Settings</h1>
+      
+      <div className="mx-4 mb-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+         <div className="p-4 flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-gray-300 flex items-center justify-center text-xl text-white font-bold">U</div>
+            <div>
+              <h3 className="font-semibold text-lg">User</h3>
+              <p className="text-xs text-gray-500">Apple ID, iCloud+</p>
+            </div>
+         </div>
+      </div>
+
+      <div className="mx-4 mb-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div onClick={() => toggle('airplane')} className="flex items-center justify-between p-3 border-b border-gray-100 cursor-pointer">
+            <div className="flex items-center gap-3"><div className="w-7 h-7 bg-orange-500 rounded flex items-center justify-center text-white"><Plane size={16}/></div><span>Airplane Mode</span></div>
+            <div className={`w-10 h-6 rounded-full p-1 transition-colors ${settings.airplane ? 'bg-green-500' : 'bg-gray-300'}`}><div className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${settings.airplane ? 'translate-x-4' : ''}`}></div></div>
+        </div>
+        <div onClick={() => toggle('wifi')} className="flex items-center justify-between p-3 border-b border-gray-100 cursor-pointer">
+            <div className="flex items-center gap-3"><div className="w-7 h-7 bg-blue-500 rounded flex items-center justify-center text-white"><Wifi size={16}/></div><span>Wi-Fi</span></div>
+            <div className="text-gray-400 text-sm flex items-center gap-2">{settings.wifi ? 'LiquidNet 5G' : 'Off'} <ChevronRight size={16}/></div>
+        </div>
+        <div onClick={() => toggle('bluetooth')} className="flex items-center justify-between p-3 cursor-pointer">
+            <div className="flex items-center gap-3"><div className="w-7 h-7 bg-blue-500 rounded flex items-center justify-center text-white"><Bluetooth size={16}/></div><span>Bluetooth</span></div>
+            <div className="text-gray-400 text-sm flex items-center gap-2">{settings.bluetooth ? 'On' : 'Off'} <ChevronRight size={16}/></div>
+        </div>
+      </div>
+      
+      <div className="mx-4 mb-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-3 border-b border-gray-100 flex items-center gap-3"><div className="w-7 h-7 bg-gray-500 rounded flex items-center justify-center text-white"><Settings size={16}/></div><span>General</span></div>
+          <div className="p-3 border-b border-gray-100 flex items-center gap-3"><div className="w-7 h-7 bg-gray-500 rounded flex items-center justify-center text-white"><LayoutGrid size={16}/></div><span>Control Center</span></div>
+          <div className="p-3 flex items-center gap-3"><div className="w-7 h-7 bg-blue-500 rounded flex items-center justify-center text-white"><Sun size={16}/></div><span>Display & Brightness</span></div>
+      </div>
+    </div>
+  );
+};
+
+const PhoneApp = ({ onStartCall, recentCalls }) => {
+    const [tab, setTab] = useState('keypad');
+    const [number, setNumber] = useState("");
+
+    const Key = ({ val, sub }) => (
+        <button onClick={() => setNumber(prev => prev.length < 12 ? prev + val : prev)} className="w-16 h-16 rounded-full bg-gray-100 active:bg-gray-300 flex flex-col items-center justify-center transition-colors">
+            <span className="text-2xl font-medium">{val}</span>
+            {sub && <span className="text-[9px] font-bold text-gray-400 uppercase">{sub}</span>}
+        </button>
+    );
+
+    if (tab === 'recents') {
+        return (
+            <div className="h-full bg-white flex flex-col pt-12">
+                 <div className="px-4 flex justify-between items-center mb-4"><span className="text-blue-500">Edit</span><div className="flex bg-gray-200 rounded-lg p-0.5"><div className="bg-white rounded px-3 py-0.5 text-xs font-bold shadow-sm">All</div><div className="px-3 py-0.5 text-xs text-gray-500">Missed</div></div></div>
+                 <h1 className="text-3xl font-bold px-4 mb-4">Recents</h1>
+                 <div className="flex-1 overflow-y-auto">
+                     {recentCalls.map((call, i) => (
+                         <div key={i} className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                             <div><div className={`font-bold ${call.type==='missed'?'text-red-500':'text-black'}`}>{call.num}</div><div className="text-xs text-gray-400">phone</div></div>
+                             <div className="text-sm text-gray-400 flex items-center gap-2">{call.time} <Info size={16} className="text-blue-500"/></div>
+                         </div>
+                     ))}
+                     {recentCalls.length === 0 && <div className="text-center text-gray-400 mt-20">No recent calls</div>}
+                 </div>
+                 {/* Tab Bar (Duplicate for simplicity in each tab) */}
+                 <div className="h-16 border-t border-gray-200 flex justify-around items-center text-[10px] text-gray-400">
+                    <button onClick={() => setTab('favorites')} className="flex flex-col items-center gap-1"><Heart size={24}/><span>Favorites</span></button>
+                    <button onClick={() => setTab('recents')} className="flex flex-col items-center gap-1 text-blue-500"><Clock size={24}/><span>Recents</span></button>
+                    <button onClick={() => setTab('contacts')} className="flex flex-col items-center gap-1"><User size={24}/><span>Contacts</span></button>
+                    <button onClick={() => setTab('keypad')} className="flex flex-col items-center gap-1"><LayoutGrid size={24}/><span>Keypad</span></button>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="h-full bg-white flex flex-col pt-12 pb-2">
+            <div className="h-24 flex items-end justify-center mb-8 px-8"><span className="text-3xl tracking-wider truncate">{number}</span></div>
+            <div className="flex-1 flex flex-col items-center justify-center gap-5">
+                {[
+                    ['1',''], ['2','ABC'], ['3','DEF'],
+                    ['4','GHI'], ['5','JKL'], ['6','MNO'],
+                    ['7','PQRS'], ['8','TUV'], ['9','WXYZ'],
+                    ['*',''], ['0','+'], ['#','']
+                ].reduce((rows, key, index) => { 
+                    if (index % 3 === 0) rows.push([]); 
+                    rows[rows.length - 1].push(key); 
+                    return rows; 
+                }, []).map((row, i) => (
+                    <div key={i} className="flex gap-6">{row.map(([k, s]) => <Key key={k} val={k} sub={s} />)}</div>
+                ))}
+                <div className="mt-2 flex items-center justify-center gap-8">
+                    <div className="w-16 h-16"></div>
+                    <button onClick={() => {if(number) onStartCall(number)}} className="w-16 h-16 rounded-full bg-green-500 text-white flex items-center justify-center active:bg-green-600 shadow-lg"><PhoneCall fill="white" size={28} /></button>
+                    <button onClick={() => setNumber(prev => prev.slice(0, -1))} className={`w-16 h-16 flex items-center justify-center text-gray-300 active:text-gray-500 ${!number && 'opacity-0'}`}><Delete size={24} /></button>
+                </div>
+            </div>
+            <div className="h-16 border-t border-gray-200 flex justify-around items-center text-[10px] text-gray-400 mt-auto">
+                <button onClick={() => setTab('favorites')} className="flex flex-col items-center gap-1"><Heart size={24}/><span>Favorites</span></button>
+                <button onClick={() => setTab('recents')} className="flex flex-col items-center gap-1"><Clock size={24}/><span>Recents</span></button>
+                <button onClick={() => setTab('contacts')} className="flex flex-col items-center gap-1"><User size={24}/><span>Contacts</span></button>
+                <button onClick={() => setTab('keypad')} className="flex flex-col items-center gap-1 text-blue-500"><LayoutGrid size={24}/><span>Keypad</span></button>
+            </div>
+        </div>
+    );
+};
+
+const SafariApp = () => {
+    const [url, setUrl] = useState("apple.com");
+    const [loading, setLoading] = useState(false);
+    const [content, setContent] = useState("apple"); // apple, bing, wiki
+
+    const go = (site) => {
+        setLoading(true);
+        setUrl(site + ".com");
+        setTimeout(() => {
+            setContent(site);
+            setLoading(false);
+        }, 800);
+    }
+
+    return (
+        <div className="h-full bg-white flex flex-col pt-10">
+            <div className="bg-gray-100 p-2 pb-3 border-b border-gray-200 flex items-center gap-2 px-4 relative">
+                <div className="flex-1 bg-white h-9 rounded-lg flex items-center px-3 gap-2 shadow-sm text-sm text-gray-700">
+                    <Lock size={12} className="text-gray-400" />
+                    <input className="outline-none flex-1 text-center" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && go('bing')}/>
+                </div>
+                <Book size={20} className="text-blue-500" />
+                {loading && <div className="absolute bottom-0 left-0 h-0.5 bg-blue-500 animate-[width_1s_ease-out] w-full"></div>}
+            </div>
+            <div className="flex-1 overflow-y-auto bg-white">
+                {content === 'apple' && (
+                    <div className="flex flex-col items-center pt-10 px-6 text-center animate-in fade-in">
+                        <div className="text-5xl font-semibold mb-4">iPhone 17 Pro</div>
+                        <p className="text-xl text-gray-500 mb-8">Titanium. So strong. So light. So Pro.</p>
+                        <img src="https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=800&auto=format&fit=crop" className="rounded-xl shadow-lg mb-8"/>
+                        <button className="bg-blue-600 text-white px-6 py-2 rounded-full font-medium">Buy</button>
+                    </div>
+                )}
+                {content === 'bing' && (
+                     <div className="flex flex-col items-center pt-20 px-6 animate-in fade-in">
+                         <h1 className="text-4xl font-bold text-gray-700 mb-6">Bing</h1>
+                         <div className="w-full border border-gray-300 rounded-full h-10 flex items-center px-4 shadow-sm text-gray-400">Ask me anything...</div>
+                         <div className="mt-8 grid grid-cols-2 gap-4 w-full">
+                             <div className="bg-gray-100 h-20 rounded-lg"></div>
+                             <div className="bg-gray-100 h-20 rounded-lg"></div>
+                         </div>
+                     </div>
+                )}
+                 {content === 'wiki' && (
+                     <div className="p-4 animate-in fade-in">
+                         <h1 className="font-serif text-2xl border-b pb-2 mb-4">Wikipedia</h1>
+                         <p className="font-serif text-sm leading-relaxed">Liquid glass is a theoretical state of matter...</p>
+                     </div>
+                )}
+            </div>
+             <div className="h-12 border-t border-gray-200 flex justify-between items-center px-6 text-blue-500 bg-white/90 backdrop-blur">
+                 <ChevronLeft className="text-gray-300" />
+                 <ChevronRight className="text-gray-300 rotate-180" />
+                 <Share />
+                 <Book />
+                 <LayoutGrid onClick={() => go('apple')} />
+            </div>
+        </div>
+    );
+};
+
+const NotesApp = ({ notes, setNotes }) => {
+    const [view, setView] = useState('list'); 
+    const [activeNote, setActiveNote] = useState(null);
+
+    const updateNote = (id, text) => {
+        setNotes(prev => prev.map(n => n.id === id ? { ...n, content: text, title: text.split('\n')[0] || 'New Note' } : n));
+        setActiveNote(prev => ({ ...prev, content: text }));
+    };
+
+    if (view === 'edit') {
+        return (
+            <div className="h-full bg-white flex flex-col pt-12">
+                <div className="px-4 flex justify-between items-center text-yellow-500 mb-4">
+                    <button onClick={() => setView('list')} className="flex items-center gap-1 font-medium"><ChevronLeft size={24}/> Notes</button>
+                    <div className="flex gap-4"><Share size={20}/><MoreHorizontal size={20}/></div>
+                </div>
+                <textarea className="flex-1 p-4 text-lg outline-none resize-none" value={activeNote.content} onChange={(e) => updateNote(activeNote.id, e.target.value)} placeholder="Type here..." autoFocus />
+            </div>
+        )
+    }
+
+    return (
+        <div className="h-full bg-gray-50 flex flex-col pt-12">
+            <h1 className="text-3xl font-bold px-4 mb-4">Notes</h1>
+            <div className="mx-4 bg-white rounded-xl shadow-sm overflow-hidden min-h-[50%]">
+                {notes.map((note) => (
+                    <div key={note.id} onClick={() => {setActiveNote(note); setView('edit');}} className="p-4 border-b border-gray-100 last:border-0 active:bg-gray-50">
+                        <h3 className="font-bold truncate">{note.title}</h3>
+                        <div className="text-sm text-gray-400 mt-1 truncate">{note.content || "No additional text"}</div>
+                    </div>
+                ))}
+            </div>
+            <div className="mt-auto h-12 bg-gray-100 border-t border-gray-200 flex justify-between items-center px-4 text-yellow-500">
+                <span className="text-xs text-gray-400">{notes.length} Notes</span>
+                <Edit3 onClick={() => {
+                    const newNote = { id: Date.now(), title: 'New Note', content: '' };
+                    setNotes([newNote, ...notes]);
+                    setActiveNote(newNote);
+                    setView('edit');
+                }} className="cursor-pointer"/>
+            </div>
+        </div>
+    );
+};
+
+const RemindersApp = ({ items, setItems }) => {
+    const toggle = (id) => setItems(prev => prev.map(i => i.id === id ? { ...i, done: !i.done } : i));
+    const add = () => {
+        const text = prompt("Reminder text:");
+        if(text) setItems([...items, { id: Date.now(), text, done: false }]);
+    };
+
+    return (
+        <div className="h-full bg-black text-white pt-12 px-4 flex flex-col">
+            <div className="flex justify-between items-center mb-4"><h1 className="text-3xl font-bold text-blue-500">Reminders</h1><Plus onClick={add} className="text-blue-500"/></div>
+            <div className="bg-gray-900 rounded-xl p-4 mb-6 grid grid-cols-2 gap-4">
+                <div className="bg-gray-800 rounded-lg p-3"><CalendarIcon className="text-blue-400 mb-2"/><div className="text-2xl font-bold">{items.filter(i=>!i.done).length}</div></div>
+                <div className="bg-gray-800 rounded-lg p-3"><Clock className="text-orange-400 mb-2"/><div className="text-2xl font-bold">0</div></div>
+            </div>
+            <h3 className="font-bold text-xl mb-2">My Lists</h3>
+            <div className="bg-gray-900 rounded-xl overflow-hidden">
+                {items.map(item => (
+                    <div key={item.id} onClick={() => toggle(item.id)} className="flex items-center gap-3 p-4 border-b border-gray-800 active:bg-gray-800 cursor-pointer">
+                        {item.done ? <CheckCircle2 className="text-blue-500 fill-blue-500/20"/> : <Circle className="text-gray-500"/>}
+                        <span className={`flex-1 ${item.done ? 'text-gray-500 line-through' : ''}`}>{item.text}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const WalletApp = () => {
+    const [expanded, setExpanded] = useState(false);
+    return (
+        <div className="h-full bg-black text-white pt-12 px-4 relative overflow-hidden" onClick={() => setExpanded(!expanded)}>
+            <div className="flex justify-between items-center mb-8"><h1 className="text-3xl font-bold">Wallet</h1><Plus size={24} className="bg-gray-800 rounded-full p-1"/></div>
+            <div className="relative mt-8 h-[500px] transition-all">
+                <div className={`absolute w-full h-48 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl p-4 shadow-xl border-t border-white/20 transition-all duration-500 ease-spring ${expanded ? 'top-0' : 'top-0 hover:-translate-y-2'}`}>
+                     <div className="flex justify-between"><span className="font-bold italic">VISA</span></div>
+                     <div className="mt-14 font-mono text-lg tracking-widest">•••• 4289</div>
+                </div>
+                <div className={`absolute w-full h-48 bg-gray-200 rounded-xl p-4 shadow-xl text-black border-t border-white/50 transition-all duration-500 ease-spring ${expanded ? 'top-52' : 'top-12 scale-[0.95]'}`}>
+                    <div className="flex gap-4"><div className="w-20 h-24 bg-gray-300 rounded-md"></div><div><h3 className="font-bold text-lg">ID Card</h3></div></div>
+                </div>
+                 <div className={`absolute w-full h-48 bg-green-700 rounded-xl p-4 shadow-xl text-white border-t border-white/20 transition-all duration-500 ease-spring ${expanded ? 'top-[420px]' : 'top-24 scale-[0.90]'}`}>
+                    <h3 className="font-bold text-lg">Starbucks</h3><p className="text-xs opacity-70">$24.50</p>
+                </div>
+            </div>
+            <p className="text-center text-gray-500 text-sm">{expanded ? 'Tap to stack' : 'Tap to view passes'}</p>
+        </div>
+    );
+};
+
+const AppStoreApp = ({ installed, setInstalled }) => {
+    const [loading, setLoading] = useState(false);
+    const isInstalled = installed.includes('game1');
+
+    const handleGet = () => {
+        if(isInstalled) return;
+        setLoading(true);
+        setTimeout(() => {
+            setLoading(false);
+            setInstalled([...installed, 'game1']);
+        }, 2000);
+    };
+
+    return (
+    <div className="h-full bg-white flex flex-col pt-12 overflow-y-auto">
+        <div className="px-4 flex justify-between items-center mb-4"><h1 className="text-3xl font-bold">Today</h1><div className="w-8 h-8 bg-blue-500 rounded-full"></div></div>
+        <div className="mx-4 mb-8 relative h-96 rounded-2xl overflow-hidden shadow-xl group cursor-pointer">
+             <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover" />
+             <div className="absolute inset-0 bg-black/30 flex flex-col justify-end p-6 text-white">
+                 <span className="text-xs font-bold uppercase opacity-80 mb-2">Game of the Day</span>
+                 <h2 className="text-3xl font-bold mb-2">Retro Future</h2>
+                 <p className="opacity-90">Experience the neon age.</p>
+             </div>
+        </div>
+         <div className="mx-4 bg-gray-100 rounded-2xl p-4 flex items-center gap-4">
+             <div className="w-16 h-16 bg-black rounded-xl flex items-center justify-center text-white"><Gamepad2/></div>
+             <div className="flex-1"><h3 className="font-bold">Retro Future</h3><p className="text-xs text-gray-500">Games</p></div>
+             <button onClick={handleGet} className="bg-gray-300 text-blue-600 px-4 py-1 rounded-full font-bold text-sm min-w-[70px]">
+                 {loading ? <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div> : (isInstalled ? 'OPEN' : 'GET')}
+             </button>
+         </div>
+         <div className="mt-auto h-14 border-t border-gray-200 flex justify-around items-center text-gray-400 text-[10px] sticky bottom-0 bg-white/90 backdrop-blur">
+             <div className="flex flex-col items-center text-blue-500"><FileText size={20}/><span>Today</span></div>
+             <div className="flex flex-col items-center"><Gamepad2 size={20}/><span>Games</span></div>
+             <div className="flex flex-col items-center"><Search size={20}/><span>Search</span></div>
+         </div>
+    </div>
+    );
+};
+
+const MapsApp = () => {
+    const [scale, setScale] = useState(1);
+    const [pos, setPos] = useState({x:0, y:0});
+    
+    return (
+        <div className="h-full bg-gray-100 flex flex-col relative overflow-hidden">
+            <div className="absolute inset-0 bg-blue-100 cursor-move" 
+                 style={{transform: `scale(${scale}) translate(${pos.x}px, ${pos.y}px)`, transition: 'transform 0.1s'}}
+            >
+                {/* Mock Map Grid */}
+                <div className="w-[1000px] h-[1000px] grid grid-cols-10 gap-1 opacity-20">
+                    {Array(100).fill(0).map((_,i) => <div key={i} className="bg-gray-400"></div>)}
+                </div>
+                {/* Pins */}
+                <div className="absolute top-[200px] left-[150px] text-red-500"><MapPin size={40} fill="red" className="animate-bounce"/><span className="bg-white px-2 rounded shadow text-xs text-black font-bold whitespace-nowrap -ml-4">Apple Park</span></div>
+            </div>
+            <div className="absolute top-12 left-4 right-4 z-20">
+                <div className="bg-white rounded-xl shadow-lg flex items-center p-3 gap-2">
+                     <Search size={18} className="text-gray-400"/><input type="text" placeholder="Search Maps" className="flex-1 outline-none text-sm"/>
+                </div>
+            </div>
+            <div className="absolute bottom-6 right-4 flex flex-col gap-2">
+                <button onClick={()=>setScale(s=>s+0.2)} className="bg-white p-2 rounded-lg shadow text-black"><Plus/></button>
+                <button onClick={()=>setScale(s=>Math.max(0.5, s-0.2))} className="bg-white p-2 rounded-lg shadow text-black"><X className="rotate-45"/></button>
+            </div>
+        </div>
+    );
+};
+
+const NewsApp = () => (
+    <div className="h-full bg-white flex flex-col pt-12 overflow-y-auto">
+        <h1 className="text-3xl font-bold px-4 mb-4 text-red-600">News</h1>
+        <div className="border-b border-gray-200 pb-4">
+             <div className="px-4 font-bold text-lg mb-2">Top Stories</div>
+             <div className="flex overflow-x-auto px-4 gap-4 pb-2">
+                 {[1,2,3].map(i => (
+                     <div key={i} className="min-w-[250px] bg-gray-50 rounded-xl overflow-hidden shadow-sm border border-gray-100 flex flex-col">
+                         <div className={`h-32 w-full bg-gray-300`}></div>
+                         <div className="p-3"><div className="text-xs text-red-600 font-bold mb-1">Breaking</div><h3 className="font-bold leading-tight">Technology advances rapidly in 2026</h3></div>
+                     </div>
+                 ))}
+             </div>
+        </div>
+        <div className="p-4 space-y-4">
+            {[1,2,3,4].map(i => (
+                <div key={i} className="flex gap-4 py-2 border-b border-gray-100">
+                    <div className="flex-1"><div className="text-xs text-gray-500 mb-1">TechDaily</div><h4 className="font-bold text-sm">New Quantum Chip Released</h4></div>
+                    <div className="w-16 h-16 bg-gray-200 rounded-lg"></div>
+                </div>
+            ))}
+        </div>
+    </div>
+);
+
+const FilesApp = () => (
+    <div className="h-full bg-white flex flex-col pt-12">
+        <div className="px-4 mb-4"><h1 className="text-3xl font-bold">Browse</h1><div className="bg-gray-100 rounded-lg flex items-center p-2 mt-2 gap-2 text-gray-500"><Search size={16}/><span className="text-sm">Search</span></div></div>
+        <div className="px-4">
+            <h3 className="font-bold text-lg mb-2">Locations</h3>
+            <div className="bg-white rounded-xl">
+                {['iCloud Drive', 'On My iPhone', 'Recently Deleted'].map((loc, i) => (
+                    <div key={i} className="flex items-center gap-3 py-3 border-b border-gray-100 last:border-0 cursor-pointer active:bg-gray-50">
+                        <Folder className="text-blue-400" size={24}/><span className="text-lg">{loc}</span><ChevronRight className="ml-auto text-gray-300" size={16}/>
+                    </div>
+                ))}
+            </div>
+        </div>
+    </div>
+);
+
+const HealthApp = () => (
+    <div className="h-full bg-black text-white pt-12 px-4 overflow-y-auto">
+         <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold">Summary</h1><div className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center"><User size={16}/></div></div>
+         <div className="bg-gray-900 rounded-2xl p-4 mb-4 flex justify-between items-center">
+             <div className="relative w-24 h-24">
+                 <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                    <path className="text-gray-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
+                    <path className="text-red-500 drop-shadow-[0_0_5px_rgba(239,68,68,0.8)]" strokeDasharray="75, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+                 </svg>
+                 <div className="absolute inset-2">
+                    <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                        <path className="text-green-500 drop-shadow-[0_0_5px_rgba(34,197,94,0.8)]" strokeDasharray="50, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+                    </svg>
+                 </div>
+             </div>
+             <div className="flex-1 ml-6 space-y-2"><div className="text-sm text-gray-400">Move <span className="text-red-500 ml-2 font-bold">350</span></div><div className="text-sm text-gray-400">Exercise <span className="text-green-500 ml-2 font-bold">25</span></div></div>
+         </div>
+         <div className="grid grid-cols-2 gap-4">
+             <div className="bg-gray-900 rounded-2xl p-4"><div className="flex items-center gap-2 text-orange-500 mb-2 font-bold text-sm"><Activity size={16}/> Steps</div><div className="text-2xl font-bold">4,281</div></div>
+              <div className="bg-gray-900 rounded-2xl p-4"><div className="flex items-center gap-2 text-red-500 mb-2 font-bold text-sm"><Heart size={16}/> Heart</div><div className="text-2xl font-bold">72 <span className="text-sm font-normal text-gray-500">BPM</span></div></div>
+         </div>
+    </div>
+);
+
+// --- Previous Apps (Preserved) ---
+// Camera, Music, Photos, Messages, Weather, Calendar, Clock, Siri
+// Re-implementing simplified versions inline to fit the file
+
+const CameraApp = ({ onTakePhoto }) => {
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => { if(videoRef.current) videoRef.current.srcObject = stream; }).catch(e=>console.log(e));
+  }, []);
+  const take = () => {
+      if(videoRef.current && canvasRef.current) {
+          canvasRef.current.getContext('2d').drawImage(videoRef.current,0,0,300,400);
+          onTakePhoto(canvasRef.current.toDataURL('image/jpeg'));
+          const flash = document.getElementById('flash'); if(flash){flash.style.opacity=1; setTimeout(()=>flash.style.opacity=0,100)}
+      }
+  }
+  return (
+    <div className="h-full bg-black flex flex-col relative">
+      <div id="flash" className="absolute inset-0 bg-white pointer-events-none opacity-0 transition-opacity z-50"></div>
+      <div className="flex-1 rounded-b-3xl mt-8 bg-gray-900 overflow-hidden"><video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover"/><canvas ref={canvasRef} width="300" height="400" className="hidden"/></div>
+      <div className="h-32 flex justify-center items-center gap-10"><div className="w-12 h-12 bg-gray-800 rounded-full"></div><button onClick={take} className="w-16 h-16 border-4 border-white rounded-full flex items-center justify-center"><div className="w-14 h-14 bg-white rounded-full active:scale-90 transition-transform"></div></button><div className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center"><RefreshCcw className="text-white"/></div></div>
+    </div>
+  )
+};
+
+const PhotosApp = ({ photos, onDelete, onLike }) => {
+    const [sel, setSel] = useState(null);
+    const p = photos.find(x=>x.id===sel);
+    if(p) return (
+        <div className="h-full bg-black flex flex-col pt-10 animate-in fade-in">
+             <div className="px-4 text-white flex justify-between"><ChevronLeft onClick={()=>setSel(null)}/><span className="text-blue-500">Edit</span></div>
+             <div className="flex-1 flex items-center justify-center"><img src={p.url} className="w-full object-contain"/></div>
+             <div className="h-20 flex justify-around items-center text-white"><Share className="text-blue-500"/><Heart onClick={()=>onLike(sel)} className={p.liked?'fill-red-500 text-red-500':''}/><Trash2 onClick={()=>{onDelete(sel);setSel(null)}} className="text-red-500"/></div>
+        </div>
+    )
+    return (
+        <div className="h-full bg-white flex flex-col pt-10">
+            <div className="px-4 pb-2 border-b"><h1 className="text-2xl font-bold">Library</h1></div>
+            <div className="flex-1 overflow-y-auto grid grid-cols-3 gap-0.5 content-start">{photos.slice().reverse().map(x=><div key={x.id} onClick={()=>setSel(x.id)} className="aspect-square bg-gray-200"><img src={x.url} className="w-full h-full object-cover"/></div>)}</div>
+        </div>
+    )
+};
+
+const MessagesApp = ({ chats, onSend }) => {
+    const [id, setId] = useState(null);
+    const [txt, setTxt] = useState("");
+    const chat = chats.find(x=>x.id===id);
+    if(chat) return (
+        <div className="h-full bg-white flex flex-col pt-10">
+             <div className="h-12 border-b flex items-center px-2"><ChevronLeft onClick={()=>setId(null)} className="text-blue-500"/><div className="mx-auto font-bold text-sm">{chat.name}</div><Video className="text-blue-500 w-6 mr-2"/></div>
+             <div className="flex-1 p-4 overflow-y-auto space-y-2">{chat.msgs.map((m,i)=><div key={i} className={`flex ${m.isMe?'justify-end':'justify-start'}`}><div className={`px-3 py-2 rounded-2xl max-w-[70%] text-sm ${m.isMe?'bg-blue-500 text-white':'bg-gray-200'}`}>{m.text}</div></div>)}</div>
+             <div className="h-12 px-2 flex items-center gap-2"><input className="flex-1 border rounded-full px-3 h-8 text-sm" value={txt} onChange={e=>setTxt(e.target.value)}/><button onClick={()=>{if(txt){onSend(id,txt);setTxt('')}}} className="text-blue-500"><Send/></button></div>
+        </div>
+    )
+    return (
+        <div className="h-full bg-white flex flex-col pt-12"><h1 className="text-3xl font-bold px-4 mb-4">Messages</h1><div className="flex-1">{chats.map(c=><div key={c.id} onClick={()=>setId(c.id)} className="px-4 py-3 border-b flex gap-3"><div className={`w-12 h-12 rounded-full ${c.avatar} flex items-center justify-center text-white`}>{c.name[0]}</div><div className="flex-1"><div className="font-bold">{c.name}</div><div className="text-gray-500 text-sm truncate">{c.msgs[c.msgs.length-1].text}</div></div></div>)}</div></div>
+    )
+};
+
+const MusicApp = ({ isPlaying, togglePlay, currentSongIdx, nextSong, prevSong }) => {
+    const song = SONGS[currentSongIdx];
+    return (
+        <div className="h-full bg-gradient-to-b from-gray-800 to-black text-white p-6 pt-12 flex flex-col items-center">
+            <div className="w-64 h-64 rounded-xl overflow-hidden shadow-2xl mb-8 mt-4"><img src={song.cover} className="w-full h-full object-cover"/></div>
+            <h2 className="text-2xl font-bold">{song.title}</h2><p className="text-gray-400">{song.artist}</p>
+            <div className="w-full mt-8 flex justify-between items-center px-4"><SkipBack onClick={prevSong} size={30}/><div onClick={togglePlay} className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-black">{isPlaying?<Pause/>:<Play/>}</div><SkipForward onClick={nextSong} size={30}/></div>
+        </div>
+    )
+};
+
+const WeatherApp = () => {
+    const [idx, setIdx] = useState(0);
+    const c = CITIES[idx];
+    return (
+        <div onClick={()=>setIdx((idx+1)%CITIES.length)} className={`h-full bg-gradient-to-b ${c.bg} text-white flex flex-col pt-20 items-center`}>
+            <h2 className="text-3xl">{c.name}</h2><h1 className="text-8xl font-thin">{c.temp}°</h1><p className="text-xl">{c.condition}</p>
+            <div className="mt-10 w-[90%] bg-white/20 rounded-xl p-4"><p className="mb-2 text-sm opacity-70">HOURLY FORECAST</p><div className="flex justify-between">{[0,1,2,3,4].map(i=><div key={i} className="flex flex-col items-center gap-1"><span className="text-xs">{i+1}PM</span><Cloud size={16}/><span className="text-sm font-bold">{c.temp+i}°</span></div>)}</div></div>
+        </div>
+    )
+};
+
+const CalendarApp = () => (
+    <div className="h-full bg-white flex flex-col pt-12 text-black"><div className="px-4 mb-4"><h1 className="text-red-500 text-3xl font-bold">January</h1></div><div className="p-4 grid grid-cols-7 gap-y-6 text-center text-sm font-medium">{Array(31).fill(0).map((_,i)=><div key={i} className={i===20?'bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center mx-auto':''}>{i+1}</div>)}</div><div className="flex-1 bg-gray-50 border-t p-4"><h3 className="text-gray-500 text-sm font-bold mb-2">UPCOMING</h3><div className="bg-white p-3 rounded-xl shadow-sm border-l-4 border-red-500"><div className="font-bold">Meeting</div><div className="text-xs text-gray-500">10:00 AM</div></div></div></div>
+);
+
+const ClockApp = () => {
+    const [t, setT] = useState(new Date());
+    useEffect(()=>{setInterval(()=>setT(new Date()),1000)},[]);
+    return <div className="h-full bg-black text-white pt-12 px-4"><h1 className="text-3xl font-bold mb-4">World Clock</h1><div className="border-b border-gray-800 py-4 flex justify-between items-end"><div className="text-gray-400 text-sm">Today, +0HRS<div className="text-white text-xl">Cupertino</div></div><div className="text-5xl font-thin">{t.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div></div></div>
+};
+
+const Delete = ({size}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>;
+
+// --- MAIN SYSTEM ---
+
+export default function App() {
+  const [locked, setLocked] = useState(true);
+  const [activeApp, setActiveApp] = useState(null);
+  const [time, setTime] = useState('');
+  
+  // States
+  const [currentPage, setCurrentPage] = useState(0);
+  const touchStartX = useRef(null);
+  const touchEndX = useRef(null);
+  
+  // Persisted App States
+  const [settings, setSettings] = useState({ wifi: true, bluetooth: true, airplane: false });
+  const [notes, setNotes] = useState([{ id: 1, title: 'Ideas', content: 'Liquid glass UI...' }]);
+  const [reminders, setReminders] = useState([{ id: 1, text: 'Buy milk', done: false }]);
+  const [installedApps, setInstalledApps] = useState([]);
+  const [photos, setPhotos] = useState(INITIAL_PHOTOS);
+  const [chats, setChats] = useState(INITIAL_CHATS);
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const [currentSongIdx, setCurrentSongIdx] = useState(0);
+  const [recentCalls, setRecentCalls] = useState([]);
+  
+  // Dynamic Island
+  const [siriActive, setSiriActive] = useState(false);
+  const [siriTranscript, setSiriTranscript] = useState("");
+  const [onCall, setOnCall] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Actions
+  const openApp = (id) => id === 'siri' ? setSiriActive(true) : setActiveApp(id);
+  const handleTakePhoto = (url) => setPhotos([...photos, { id: Date.now(), url, liked: false }]);
+  const handleCall = (num) => { setOnCall(true); setRecentCalls([{num, time:'Just now', type:'out'}, ...recentCalls]); setActiveApp(null); setTimeout(()=>setOnCall(false),5000); };
+  
+  // Swipe Handlers
+  const minSwipeDistance = 50;
+
+  // Touch
+  const onTouchStart = (e) => { touchEndX.current = null; touchStartX.current = e.targetTouches[0].clientX; };
+  const onTouchMove = (e) => { touchEndX.current = e.targetTouches[0].clientX; };
+  const onTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return;
+    const distance = touchStartX.current - touchEndX.current;
+    if (distance > minSwipeDistance && currentPage < 1) setCurrentPage(1);
+    if (distance < -minSwipeDistance && currentPage > 0) setCurrentPage(0);
+  };
+
+  // Mouse (Fix)
+  const onMouseDown = (e) => { touchEndX.current = null; touchStartX.current = e.clientX; };
+  const onMouseMove = (e) => { if(e.buttons === 1) touchEndX.current = e.clientX; };
+  const onMouseUp = () => {
+      if (!touchStartX.current || !touchEndX.current) return;
+      const distance = touchStartX.current - touchEndX.current;
+      if (distance > minSwipeDistance && currentPage < 1) setCurrentPage(1);
+      if (distance < -minSwipeDistance && currentPage > 0) setCurrentPage(0);
+      touchStartX.current = null; touchEndX.current = null;
+  };
+
+  let islandMode = 'normal';
+  if (onCall) islandMode = 'call';
+  else if (musicPlaying) islandMode = 'music';
+  else if (siriActive) islandMode = 'siri';
+
+  if (locked) return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center font-sans py-10 select-none">
+        <div className="relative w-[375px] h-[812px] bg-black rounded-[50px] overflow-hidden shadow-2xl border-[8px] border-gray-800" style={{ backgroundImage: `url(${WALLPAPER_URL})`, backgroundSize: 'cover' }} onClick={() => setLocked(false)}>
+          <div className="absolute inset-0 bg-black/20"></div>
+          <StatusBar time={time} wifiOn={settings.wifi} />
+          <div className="absolute top-24 w-full flex flex-col items-center text-white"><Lock size={24} className="mb-4"/><div className="text-7xl font-thin">{time}</div><div className="text-lg font-medium">Wednesday, January 21</div></div>
+          <div className="absolute bottom-10 w-full flex flex-col items-center space-y-8"><div className="flex w-full justify-between px-12"><div className="w-12 h-12 bg-black/40 rounded-full flex items-center justify-center text-white"><Flashlight size={20}/></div><div className="w-12 h-12 bg-black/40 rounded-full flex items-center justify-center text-white"><Camera size={20}/></div></div><div className="w-32 h-1 bg-white rounded-full"></div></div>
+        </div>
+      </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center font-sans py-10 select-none">
+      <div className="relative w-[375px] h-[812px] bg-black rounded-[50px] overflow-hidden shadow-2xl border-[8px] border-gray-800" style={{ backgroundImage: `url(${WALLPAPER_URL})`, backgroundSize: 'cover' }}>
+        <div className="absolute inset-0 bg-white/5 backdrop-blur-[1px]"></div>
+        <StatusBar time={time} wifiOn={settings.wifi} />
+        <DynamicIsland mode={islandMode} />
+        {siriActive && <div className="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex flex-col justify-end items-center pb-20 text-white" onClick={()=>setSiriActive(false)}><div className="text-2xl font-bold mb-10">{siriTranscript || "我在听..."}</div><div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse blur-lg"></div></div>}
+
+        <div className={`absolute inset-0 z-40 bg-black transition-transform duration-500 ${activeApp ? 'scale-100' : 'scale-90 translate-y-full opacity-0 pointer-events-none'}`}>
+           {activeApp && (
+             <>
+               {activeApp === 'camera' && <CameraApp onTakePhoto={handleTakePhoto} />}
+               {activeApp === 'photos' && <PhotosApp photos={photos} onDelete={id=>setPhotos(photos.filter(p=>p.id!==id))} onLike={id=>setPhotos(photos.map(p=>p.id===id?{...p,liked:!p.liked}:p))} />}
+               {activeApp === 'messages' && <MessagesApp chats={chats} onSend={(id,t)=>{setChats(chats.map(c=>c.id===id?{...c,msgs:[...c.msgs,{text:t,isMe:true}]}:c)); setTimeout(()=>setChats(prev=>prev.map(c=>c.id===id?{...c,msgs:[...c.msgs,{text:"OK!",isMe:false}]}:c)),1000)}} />}
+               {activeApp === 'music' && <MusicApp isPlaying={musicPlaying} togglePlay={()=>setMusicPlaying(!musicPlaying)} currentSongIdx={currentSongIdx} nextSong={()=>setCurrentSongIdx((currentSongIdx+1)%SONGS.length)} prevSong={()=>setCurrentSongIdx((currentSongIdx-1+SONGS.length)%SONGS.length)} />}
+               {activeApp === 'weather' && <WeatherApp />}
+               {activeApp === 'calendar' && <CalendarApp />}
+               {activeApp === 'clock' && <ClockApp />}
+               {activeApp === 'calculator' && <CalculatorApp />}
+               {activeApp === 'settings' && <SettingsApp settings={settings} setSettings={setSettings} />}
+               {activeApp === 'phone' && <PhoneApp onStartCall={handleCall} recentCalls={recentCalls} />}
+               {activeApp === 'safari' && <SafariApp />}
+               {activeApp === 'notes' && <NotesApp notes={notes} setNotes={setNotes} />}
+               {activeApp === 'reminders' && <RemindersApp items={reminders} setItems={setReminders} />}
+               {activeApp === 'store' && <AppStoreApp installed={installedApps} setInstalled={setInstalledApps} />}
+               {activeApp === 'wallet' && <WalletApp />}
+               {activeApp === 'maps' && <MapsApp />}
+               {activeApp === 'news' && <NewsApp />}
+               {activeApp === 'files' && <FilesApp />}
+               {activeApp === 'health' && <HealthApp />}
+
+               <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-full h-8 z-50 flex items-center justify-center cursor-pointer" onClick={() => setActiveApp(null)}><div className="w-32 h-1 bg-gray-500 rounded-full hover:bg-white transition-colors"></div></div>
+             </>
+           )}
+        </div>
+
+        <div className={`h-full flex flex-col pt-16 transition-all duration-300 ${activeApp ? 'scale-90 opacity-0' : 'scale-100 opacity-100'}`}>
+            <div 
+                className="flex-1 overflow-hidden relative cursor-grab active:cursor-grabbing" 
+                onTouchStart={onTouchStart} 
+                onTouchMove={onTouchMove} 
+                onTouchEnd={onTouchEnd}
+                onMouseDown={onMouseDown}
+                onMouseMove={onMouseMove}
+                onMouseUp={onMouseUp}
+                onMouseLeave={onMouseUp}
+            >
+                <div className="flex h-full w-[200%] transition-transform duration-500" style={{ transform: `translateX(-${currentPage * 50}%)` }}>
+                    <div className="w-[50%] px-6"><div className="grid grid-cols-4 gap-x-4 gap-y-6">{APPS_PAGE_1.map(app => <AppIcon key={app.id} app={app} onClick={openApp} />)}</div></div>
+                    <div className="w-[50%] px-6"><div className="grid grid-cols-4 gap-x-4 gap-y-6">{APPS_PAGE_2.map(app => <AppIcon key={app.id} app={app} onClick={openApp} />)}</div></div>
+                </div>
+            </div>
+            <div className="mt-auto mb-4 flex justify-center space-x-2 z-10"><div className={`w-2 h-2 rounded-full ${currentPage===0?'bg-white':'bg-white/40'}`}></div><div className={`w-2 h-2 rounded-full ${currentPage===1?'bg-white':'bg-white/40'}`}></div></div>
+            <div className="mb-6 mx-6 relative z-10"><div className="absolute inset-0 bg-white/20 backdrop-blur-xl rounded-[35px] border border-white/10 shadow-lg"></div><div className="relative z-10 p-4 grid grid-cols-4 gap-4 justify-items-center">{DOCK_APPS.map(app => <AppIcon key={app.id} app={app} onClick={openApp} />)}</div></div>
+        </div>
+        <div className="absolute right-0 top-[200px] w-4 h-24 z-50 cursor-pointer" onClick={() => setSiriActive(true)}></div>
+      </div>
+    </div>
+  );
+}
